@@ -1,4 +1,4 @@
-name: Build Android & Windows Apps
+name: Build Android APK & Windows Installer
 
 on:
   push:
@@ -6,9 +6,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  # ==========================================
+  # JOB 1: BUILD ANDROID APK
+  # ==========================================
+  build-android:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,16 +26,10 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Install Wine (Required to stamp .ico onto Windows .exe)
-        run: |
-          sudo dpkg --add-architecture i386
-          sudo apt-get update
-          sudo apt-get install -y wine64 wine32 imagemagick
-
-      - name: Install Capacitor dependencies
+      - name: Install dependencies
         run: npm install
 
-      - name: Generate ZXC Stream Icon & Splash Screen via Node
+      - name: Generate ZXC Stream Icon & Splash Screen
         run: |
           node -e '
           const fs = require("fs");
@@ -47,10 +43,8 @@ jobs:
             await sharp({ create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 1 } } }).png().toFile("assets/icon-background.png");
             await sharp(Buffer.from(splashSvg)).png().toFile("assets/splash.png");
             await sharp(Buffer.from(splashSvg)).png().toFile("assets/splash-dark.png");
-            await sharp(Buffer.from(svg)).resize(256, 256).png().toFile("assets/icon-256.png");
           })();
           '
-          convert assets/icon-256.png assets/icon.ico
 
       - name: Generate Android Platform & Apply Icons
         run: |
@@ -58,7 +52,7 @@ jobs:
           npx capacitor-assets generate --android --iconBackgroundColor '#000000' --iconBackgroundColorDark '#000000' --splashBackgroundColor '#000000' --splashBackgroundColorDark '#000000'
           npx cap sync android
 
-      - name: Enable Immersive Fullscreen & Auto-Rotation (Android)
+      - name: Enable Immersive Fullscreen & Auto-Rotation
         run: |
           node -e '
           const fs = require("fs");
@@ -114,26 +108,86 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Build Windows Desktop App (.exe)
-        run: |
-          npx nativefier "https://zxcstream.com/" \
-            --name "ZXC Stream" \
-            --platform "windows" \
-            --arch "x64" \
-            --icon "assets/icon.ico" \
-            --background-color "#000000" \
-            --single-instance \
-            --internal-urls ".*zxcstream\.com.*" \
-            windows-build
-
       - name: Upload Compiled Android APK
         uses: actions/upload-artifact@v4
         with:
           name: ZXC-Stream-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Upload Compiled Windows EXE
+  # ==========================================
+  # JOB 2: BUILD WINDOWS SETUP .EXE INSTALLER
+  # ==========================================
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate Windows Icon & Electron Main Script
+        shell: bash
+        run: |
+          node -e '
+          const fs = require("fs");
+          const sharp = require("sharp");
+          fs.mkdirSync("assets", { recursive: true });
+
+          // 1. Generate 512x512 App Icon for Windows Installer
+          const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><rect width="1024" height="1024" fill="#000000" rx="180"/><g transform="translate(180, 180) scale(1.296875)"><polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/><path d="M 42,52 L 502,52 Q 512,52 504,62 L 154,412 L 320,412 L 385,332 L 504,452 Q 512,460 500,460 L 12,460 Q 0,460 8,450 L 358,100 L 92,100 L 36,60 Q 32,52 42,52 Z" fill="#D60000"/></g></svg>`;
+
+          // 2. Create Standalone Electron App Script (Fullscreen Ready + Pop-up Ad Blocker)
+          const electronCode = `
+          const { app, BrowserWindow } = require("electron");
+          const path = require("path");
+
+          function createWindow() {
+            const win = new BrowserWindow({
+              width: 1280,
+              height: 800,
+              backgroundColor: "#000000",
+              title: "ZXC Stream",
+              icon: path.join(__dirname, "assets/icon.png"),
+              autoHideMenuBar: true,
+              webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true
+              }
+            });
+
+            win.maximize();
+            win.loadURL("https://zxcstream.com/");
+
+            // Block external pop-up ad windows automatically
+            win.webContents.setWindowOpenHandler(({ url }) => {
+              if (url.includes("zxcstream.com")) {
+                return { action: "allow" };
+              }
+              return { action: "deny" };
+            });
+          }
+
+          app.whenReady().then(createWindow);
+          app.on("window-all-closed", () => {
+            if (process.platform !== "darwin") app.quit();
+          });
+          `;
+
+          fs.writeFileSync("electron-main.js", electronCode.trim());
+          sharp(Buffer.from(svg)).resize(512, 512).png().toFile("assets/icon.png");
+          '
+
+      - name: Compile Standalone Windows NSIS Setup .EXE
+        run: npx electron-builder --win nsis --x64
+
+      - name: Upload Windows Setup Installer (.exe)
         uses: actions/upload-artifact@v4
         with:
-          name: ZXC-Stream-Windows-EXE
-          path: windows-build/ZXC Stream-win32-x64/
+          name: ZXC-Stream-Windows-Installer
+          path: dist/*Setup*.exe
