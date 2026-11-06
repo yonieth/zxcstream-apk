@@ -1,0 +1,12 @@
+{
+  "appId": "com.zxcstream.app",
+  "appName": "ZXC Stream",
+  "webDir": "www",
+  "server": {
+    "url": "https://zxcstream.com/",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}
