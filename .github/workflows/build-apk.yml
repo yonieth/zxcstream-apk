@@ -6,9 +6,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ==========================================
-  # JOB 1: BUILD ANDROID APK
-  # ==========================================
   build-android:
     runs-on: ubuntu-latest
     steps:
@@ -35,8 +32,8 @@ jobs:
           const fs = require("fs");
           const sharp = require("sharp");
           fs.mkdirSync("assets", { recursive: true });
-          const svg = `<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" viewBox="0 0 1024 1024" width="1024" height="1024"><rect width="1024" height="1024" fill="#000000"/><g transform="translate(180, 180) scale(1.296875)"><polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/><path d="M 42,52 L 502,52 Q 512,52 504,62 L 154,412 L 320,412 L 385,332 L 504,452 Q 512,460 500,460 L 12,460 Q 0,460 8,450 L 358,100 L 92,100 L 36,60 Q 32,52 42,52 Z" fill="#D60000"/></g></svg>`;
-          const splashSvg = `<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" viewBox="0 0 2732 2732" width="2732" height="2732"><rect width="2732" height="2732" fill="#000000"/><g transform="translate(1034, 1034) scale(1.296875)"><polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/><path d="M 42,52 L 502,52 Q 512,52 504,62 L 154,412 L 320,412 L 385,332 L 504,452 Q 512,460 500,460 L 12,460 Q 0,460 8,450 L 358,100 L 92,100 L 36,60 Q 32,52 42,52 Z" fill="#D60000"/></g></svg>`;
+          const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><rect width="1024" height="1024" fill="#000000"/><g transform="translate(180, 180) scale(1.296875)"><polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/><path d="M 42,52 L 502,52 Q 512,52 504,62 L 154,412 L 320,412 L 385,332 L 504,452 Q 512,460 500,460 L 12,460 Q 0,460 8,450 L 358,100 L 92,100 L 36,60 Q 32,52 42,52 Z" fill="#D60000"/></g></svg>`;
+          const splashSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2732 2732" width="2732" height="2732"><rect width="2732" height="2732" fill="#000000"/><g transform="translate(1034, 1034) scale(1.296875)"><polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/><path d="M 42,52 L 502,52 Q 512,52 504,62 L 154,412 L 320,412 L 385,332 L 504,452 Q 512,460 500,460 L 12,460 Q 0,460 8,450 L 358,100 L 92,100 L 36,60 Q 32,52 42,52 Z" fill="#D60000"/></g></svg>`;
           (async () => {
             await sharp(Buffer.from(svg)).png().toFile("assets/icon.png");
             await sharp(Buffer.from(svg)).png().toFile("assets/icon-foreground.png");
@@ -58,48 +55,39 @@ jobs:
           const fs = require("fs");
           let manifest = fs.readFileSync("android/app/src/main/AndroidManifest.xml", "utf8");
           manifest = manifest.replace("<application", "<application android:usesCleartextTraffic=\"true\"");
-          manifest = manifest.replace(
-            "android:name=\".MainActivity\"",
-            "android:name=\".MainActivity\" android:screenOrientation=\"fullSensor\""
-          );
+          manifest = manifest.replace("android:name=\".MainActivity\"", "android:name=\".MainActivity\" android:screenOrientation=\"fullSensor\"");
           fs.writeFileSync("android/app/src/main/AndroidManifest.xml", manifest);
-
-          const javaCode = `package com.zxcstream.app;
-
-          import android.os.Bundle;
-          import android.view.WindowManager;
-          import androidx.core.view.WindowCompat;
-          import androidx.core.view.WindowInsetsCompat;
-          import androidx.core.view.WindowInsetsControllerCompat;
-          import com.getcapacitor.BridgeActivity;
-
-          public class MainActivity extends BridgeActivity {
-              @Override
-              public void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-                  hideSystemBars();
-              }
-
-              @Override
-              public void onWindowFocusChanged(boolean hasFocus) {
-                  super.onWindowFocusChanged(hasFocus);
-                  if (hasFocus) {
-                      hideSystemBars();
-                  }
-              }
-
-              private void hideSystemBars() {
-                  WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
-                  WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
-                  if (controller != null) {
-                      controller.hide(WindowInsetsCompat.Type.systemBars());
-                      controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-                  }
-              }
-          }
-          `;
-          fs.writeFileSync("android/app/src/main/java/com/zxcstream/app/MainActivity.java", javaCode.trim());
+          const javaCode = [
+            "package com.zxcstream.app;",
+            "import android.os.Bundle;",
+            "import android.view.WindowManager;",
+            "import androidx.core.view.WindowCompat;",
+            "import androidx.core.view.WindowInsetsCompat;",
+            "import androidx.core.view.WindowInsetsControllerCompat;",
+            "import com.getcapacitor.BridgeActivity;",
+            "public class MainActivity extends BridgeActivity {",
+            "    @Override",
+            "    public void onCreate(Bundle savedInstanceState) {",
+            "        super.onCreate(savedInstanceState);",
+            "        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);",
+            "        hideSystemBars();",
+            "    }",
+            "    @Override",
+            "    public void onWindowFocusChanged(boolean hasFocus) {",
+            "        super.onWindowFocusChanged(hasFocus);",
+            "        if (hasFocus) hideSystemBars();",
+            "    }",
+            "    private void hideSystemBars() {",
+            "        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);",
+            "        WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());",
+            "        if (controller != null) {",
+            "            controller.hide(WindowInsetsCompat.Type.systemBars());",
+            "            controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);",
+            "        }",
+            "    }",
+            "}"
+          ].join("\n");
+          fs.writeFileSync("android/app/src/main/java/com/zxcstream/app/MainActivity.java", javaCode);
           '
 
       - name: Build Debug APK with Gradle
@@ -114,84 +102,91 @@ jobs:
           name: ZXC-Stream-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
-  # ==========================================
-  # JOB 2: BUILD WINDOWS SETUP .EXE INSTALLER
-  # ==========================================
   build-windows:
     runs-on: windows-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Generate Windows Icon & Electron Main Script
+      - name: Create Isolated Windows Electron Installer Project
         shell: bash
         run: |
-          cat << 'EOF' > generate-win.js
+          mkdir -p win-app
+          cd win-app
+          npm init -y
+          npm install --save-dev electron@30.0.0 electron-builder@24.13.3 sharp@0.33.0
+          node -e '
           const fs = require("fs");
           const sharp = require("sharp");
 
-          fs.mkdirSync("assets", { recursive: true });
+          const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><rect width="1024" height="1024" fill="#000000" rx="180"/><g transform="translate(180, 180) scale(1.296875)"><polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/><path d="M 42,52 L 502,52 Q 512,52 504,62 L 154,412 L 320,412 L 385,332 L 504,452 Q 512,460 500,460 L 12,460 Q 0,460 8,450 L 358,100 L 92,100 L 36,60 Q 32,52 42,52 Z" fill="#D60000"/></g></svg>`;
 
-          const svg = `<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" viewBox="0 0 1024 1024" width="1024" height="1024"><rect width="1024" height="1024" fill="#000000" rx="180"/><g transform="translate(180, 180) scale(1.296875)"><polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/><path d="M 42,52 L 502,52 Q 512,52 504,62 L 154,412 L 320,412 L 385,332 L 504,452 Q 512,460 500,460 L 12,460 Q 0,460 8,450 L 358,100 L 92,100 L 36,60 Q 32,52 42,52 Z" fill="#D60000"/></g></svg>`;
+          const mainJs = [
+            "const { app, BrowserWindow } = require(\"electron\");",
+            "const path = require(\"path\");",
+            "function createWindow() {",
+            "  const win = new BrowserWindow({",
+            "    width: 1280, height: 800, backgroundColor: \"#000000\",",
+            "    title: \"ZXC Stream\", icon: path.join(__dirname, \"icon.png\"),",
+            "    autoHideMenuBar: true,",
+            "    webPreferences: { nodeIntegration: false, contextIsolation: true }",
+            "  });",
+            "  win.maximize();",
+            "  win.loadURL(\"https://zxcstream.com/\");",
+            "  win.webContents.setWindowOpenHandler(({ url }) => {",
+            "    return url.includes(\"zxcstream.com\") ? { action: \"allow\" } : { action: \"deny\" };",
+            "  });",
+            "}",
+            "app.whenReady().then(createWindow);",
+            "app.on(\"window-all-closed\", () => { if (process.platform !== \"darwin\") app.quit(); });"
+          ].join("\n");
 
-          const electronCode = `const { app, BrowserWindow } = require("electron");
-          const path = require("path");
+          fs.writeFileSync("main.js", mainJs);
 
-          function createWindow() {
-            const win = new BrowserWindow({
-              width: 1280,
-              height: 800,
-              backgroundColor: "#000000",
-              title: "ZXC Stream",
-              icon: path.join(__dirname, "assets/icon.png"),
-              autoHideMenuBar: true,
-              webPreferences: {
-                nodeIntegration: false,
-                contextIsolation: true
+          const pkg = {
+            name: "zxcstream-desktop",
+            version: "1.0.0",
+            description: "ZXC Stream Desktop App",
+            author: "ZXC Stream",
+            main: "main.js",
+            devDependencies: {
+              electron: "30.0.0",
+              "electron-builder": "24.13.3"
+            },
+            build: {
+              appId: "com.zxcstream.desktop",
+              productName: "ZXC Stream",
+              files: ["main.js", "icon.png", "package.json"],
+              win: { target: "nsis", icon: "icon.png" },
+              nsis: {
+                oneClick: false,
+                allowToChangeInstallationDirectory: true,
+                createDesktopShortcut: true,
+                createStartMenuShortcut: true,
+                shortcutName: "ZXC Stream"
               }
-            });
+            }
+          };
 
-            win.maximize();
-            win.loadURL("[https://zxcstream.com/](https://zxcstream.com/)");
+          fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2));
 
-            win.webContents.setWindowOpenHandler(({ url }) => {
-              if (url.includes("zxcstream.com")) {
-                return { action: "allow" };
-              }
-              return { action: "deny" };
-            });
-          }
-
-          app.whenReady().then(createWindow);
-          app.on("window-all-closed", () => {
-            if (process.platform !== "darwin") app.quit();
+          sharp(Buffer.from(svg)).resize(512, 512).png().toFile("icon.png").then(() => {
+            console.log("Icon ready");
           });
-          `;
+          '
 
-          fs.writeFileSync("electron-main.js", electronCode);
-
-          (async () => {
-            await sharp(Buffer.from(svg)).resize(512, 512).png().toFile("assets/icon.png");
-            console.log("Windows assets generated successfully.");
-          })();
-          EOF
-          node generate-win.js
-
-      - name: Compile Standalone Windows NSIS Setup .EXE
+      - name: Build Windows Setup .EXE with NSIS Wizard
+        shell: bash
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
-        run: npx electron-builder --win nsis --x64
+        run: |
+          cd win-app
+          npx electron-builder --win nsis --x64
 
       - name: Upload Windows Setup Installer (.exe)
         uses: actions/upload-artifact@v4
         with:
           name: ZXC-Stream-Windows-Installer
-          path: dist/*.exe
+          path: win-app/dist/*.exe
