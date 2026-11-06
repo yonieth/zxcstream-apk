@@ -50,9 +50,59 @@ jobs:
           npx capacitor-assets generate --android --iconBackgroundColor '#000000' --iconBackgroundColorDark '#000000' --splashBackgroundColor '#000000' --splashBackgroundColorDark '#000000'
           npx cap sync android
 
-      - name: Configure Fullscreen & Video Support
+      - name: Enable Immersive Fullscreen & Auto-Rotation
         run: |
-          sed -i 's/<application/<application android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
+          node -e '
+          const fs = require("fs");
+
+          // 1. Update AndroidManifest.xml for smooth 4-way sensor auto-rotation without reloading the video
+          let manifest = fs.readFileSync("android/app/src/main/AndroidManifest.xml", "utf8");
+          manifest = manifest.replace("<application", "<application android:usesCleartextTraffic=\"true\"");
+          manifest = manifest.replace(
+            "android:name=\".MainActivity\"",
+            "android:name=\".MainActivity\" android:screenOrientation=\"fullSensor\""
+          );
+          fs.writeFileSync("android/app/src/main/AndroidManifest.xml", manifest);
+
+          // 2. Update MainActivity.java to hide top status bar & bottom navigation bar (Immersive Sticky Mode)
+          const javaCode = `package com.zxcstream.app;
+
+          import android.os.Bundle;
+          import android.view.WindowManager;
+          import androidx.core.view.WindowCompat;
+          import androidx.core.view.WindowInsetsCompat;
+          import androidx.core.view.WindowInsetsControllerCompat;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  // Keep screen awake while watching streams
+                  getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                  hideSystemBars();
+              }
+
+              @Override
+              public void onWindowFocusChanged(boolean hasFocus) {
+                  super.onWindowFocusChanged(hasFocus);
+                  if (hasFocus) {
+                      hideSystemBars();
+                  }
+              }
+
+              private void hideSystemBars() {
+                  WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+                  WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+                  if (controller != null) {
+                      controller.hide(WindowInsetsCompat.Type.systemBars());
+                      controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                  }
+              }
+          }
+          `;
+          fs.writeFileSync("android/app/src/main/java/com/zxcstream/app/MainActivity.java", javaCode.trim());
+          '
 
       - name: Build Debug APK with Gradle
         run: |
