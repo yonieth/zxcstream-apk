@@ -35,8 +35,8 @@ jobs:
           const fs = require("fs");
           const sharp = require("sharp");
           fs.mkdirSync("assets", { recursive: true });
-          const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><rect width="1024" height="1024" fill="#000000"/><g transform="translate(180, 180) scale(1.296875)"><polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/><path d="M 42,52 L 502,52 Q 512,52 504,62 L 154,412 L 320,412 L 385,332 L 504,452 Q 512,460 500,460 L 12,460 Q 0,460 8,450 L 358,100 L 92,100 L 36,60 Q 32,52 42,52 Z" fill="#D60000"/></g></svg>`;
-          const splashSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2732 2732" width="2732" height="2732"><rect width="2732" height="2732" fill="#000000"/><g transform="translate(1034, 1034) scale(1.296875)"><polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/><path d="M 42,52 L 502,52 Q 512,52 504,62 L 154,412 L 320,412 L 385,332 L 504,452 Q 512,460 500,460 L 12,460 Q 0,460 8,450 L 358,100 L 92,100 L 36,60 Q 32,52 42,52 Z" fill="#D60000"/></g></svg>`;
+          const svg = `<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" viewBox="0 0 1024 1024" width="1024" height="1024"><rect width="1024" height="1024" fill="#000000"/><g transform="translate(180, 180) scale(1.296875)"><polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/><path d="M 42,52 L 502,52 Q 512,52 504,62 L 154,412 L 320,412 L 385,332 L 504,452 Q 512,460 500,460 L 12,460 Q 0,460 8,450 L 358,100 L 92,100 L 36,60 Q 32,52 42,52 Z" fill="#D60000"/></g></svg>`;
+          const splashSvg = `<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" viewBox="0 0 2732 2732" width="2732" height="2732"><rect width="2732" height="2732" fill="#000000"/><g transform="translate(1034, 1034) scale(1.296875)"><polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/><path d="M 42,52 L 502,52 Q 512,52 504,62 L 154,412 L 320,412 L 385,332 L 504,452 Q 512,460 500,460 L 12,460 Q 0,460 8,450 L 358,100 L 92,100 L 36,60 Q 32,52 42,52 Z" fill="#D60000"/></g></svg>`;
           (async () => {
             await sharp(Buffer.from(svg)).png().toFile("assets/icon.png");
             await sharp(Buffer.from(svg)).png().toFile("assets/icon-foreground.png");
@@ -55,58 +55,143 @@ jobs:
       - name: Enable Immersive Fullscreen & Auto-Rotation
         run: |
           node -e '
-          constYour workflow run **#13 (`Build Android APK & Windows Installer`)** ran for **1m 58s** before failing[cite: 3]. Because the Android build takes ~1m 45s to finish[cite: 2], a failure at the 1m 58s mark means the `build-windows` job failed right at the end during the `npx electron-builder --win nsis --x64` packaging step.
+          const fs = require("fs");
+          let manifest = fs.readFileSync("android/app/src/main/AndroidManifest.xml", "utf8");
+          manifest = manifest.replace("<application", "<application android:usesCleartextTraffic=\"true\"");
+          manifest = manifest.replace(
+            "android:name=\".MainActivity\"",
+            "android:name=\".MainActivity\" android:screenOrientation=\"fullSensor\""
+          );
+          fs.writeFileSync("android/app/src/main/AndroidManifest.xml", manifest);
 
-This happens for two specific reasons in `electron-builder`:
-1. **`files` packaging conflict:** Without an explicit `"files"` array in `package.json`, `electron-builder` tries to bundle the entire repository (or fails if `electron-main.js` wasn't saved before `sharp` finished its async image write).
-2. **Async Icon Race Condition:** In the previous script, `sharp(...).toFile("assets/icon.png")` was called without `await`, meaning `electron-builder` started before `assets/icon.png` finished writing to disk.
+          const javaCode = `package com.zxcstream.app;
 
-Here is the exact fix to make both `build-android` and `build-windows` pass with green checkmarks.
+          import android.os.Bundle;
+          import android.view.WindowManager;
+          import androidx.core.view.WindowCompat;
+          import androidx.core.view.WindowInsetsCompat;
+          import androidx.core.view.WindowInsetsControllerCompat;
+          import com.getcapacitor.BridgeActivity;
 
----
+          public class MainActivity extends BridgeActivity {
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                  hideSystemBars();
+              }
 
-### Step 1: Update `package.json`
-Add `"files": ["electron-main.js", "assets/**/*", "package.json"]` to the `"build"` section so `electron-builder` only packages the necessary Windows files cleanly.
+              @Override
+              public void onWindowFocusChanged(boolean hasFocus) {
+                  super.onWindowFocusChanged(hasFocus);
+                  if (hasFocus) {
+                      hideSystemBars();
+                  }
+              }
 
-1. Open **`package.json`** in your GitHub repository and click the **Edit (pencil)** icon.
-2. Replace the entire file with this exact JSON:
+              private void hideSystemBars() {
+                  WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+                  WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+                  if (controller != null) {
+                      controller.hide(WindowInsetsCompat.Type.systemBars());
+                      controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                  }
+              }
+          }
+          `;
+          fs.writeFileSync("android/app/src/main/java/com/zxcstream/app/MainActivity.java", javaCode.trim());
+          '
 
-```json
-{
-  "name": "zxcstream-app",
-  "version": "1.0.0",
-  "description": "ZXC Stream Official App",
-  "author": "ZXC Stream",
-  "main": "electron-main.js",
-  "dependencies": {
-    "@capacitor/android": "^6.0.0",
-    "@capacitor/cli": "^6.0.0",
-    "@capacitor/core": "^6.0.0"
-  },
-  "devDependencies": {
-    "@capacitor/assets": "^3.0.5",
-    "electron": "^30.0.0",
-    "electron-builder": "^24.13.3",
-    "sharp": "^0.33.0"
-  },
-  "build": {
-    "appId": "com.zxcstream.app",
-    "productName": "ZXC Stream",
-    "files": [
-      "electron-main.js",
-      "assets/**/*",
-      "package.json"
-    ],
-    "win": {
-      "target": "nsis",
-      "icon": "assets/icon.png"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "ZXC Stream"
-    }
-  }
-}
+      - name: Build Debug APK with Gradle
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload Compiled Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZXC-Stream-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+
+  # ==========================================
+  # JOB 2: BUILD WINDOWS SETUP .EXE INSTALLER
+  # ==========================================
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate Windows Icon & Electron Main Script
+        shell: bash
+        run: |
+          cat << 'EOF' > generate-win.js
+          const fs = require("fs");
+          const sharp = require("sharp");
+
+          fs.mkdirSync("assets", { recursive: true });
+
+          const svg = `<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" viewBox="0 0 1024 1024" width="1024" height="1024"><rect width="1024" height="1024" fill="#000000" rx="180"/><g transform="translate(180, 180) scale(1.296875)"><polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/><path d="M 42,52 L 502,52 Q 512,52 504,62 L 154,412 L 320,412 L 385,332 L 504,452 Q 512,460 500,460 L 12,460 Q 0,460 8,450 L 358,100 L 92,100 L 36,60 Q 32,52 42,52 Z" fill="#D60000"/></g></svg>`;
+
+          const electronCode = `const { app, BrowserWindow } = require("electron");
+          const path = require("path");
+
+          function createWindow() {
+            const win = new BrowserWindow({
+              width: 1280,
+              height: 800,
+              backgroundColor: "#000000",
+              title: "ZXC Stream",
+              icon: path.join(__dirname, "assets/icon.png"),
+              autoHideMenuBar: true,
+              webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true
+              }
+            });
+
+            win.maximize();
+            win.loadURL("[https://zxcstream.com/](https://zxcstream.com/)");
+
+            win.webContents.setWindowOpenHandler(({ url }) => {
+              if (url.includes("zxcstream.com")) {
+                return { action: "allow" };
+              }
+              return { action: "deny" };
+            });
+          }
+
+          app.whenReady().then(createWindow);
+          app.on("window-all-closed", () => {
+            if (process.platform !== "darwin") app.quit();
+          });
+          `;
+
+          fs.writeFileSync("electron-main.js", electronCode);
+
+          (async () => {
+            await sharp(Buffer.from(svg)).resize(512, 512).png().toFile("assets/icon.png");
+            console.log("Windows assets generated successfully.");
+          })();
+          EOF
+          node generate-win.js
+
+      - name: Compile Standalone Windows NSIS Setup .EXE
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npx electron-builder --win nsis --x64
+
+      - name: Upload Windows Setup Installer (.exe)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZXC-Stream-Windows-Installer
+          path: dist/*.exe
