@@ -27,32 +27,22 @@ jobs:
       - name: Install Capacitor dependencies
         run: npm install
 
-      - name: Prepare ZXC Stream Icon & Splash Assets
+      - name: Generate ZXC Stream Icon & Splash Screen via Node
         run: |
-          mkdir -p assets
-          if [ -f "brand.0skne4t7ee-cp.png" ]; then
-            # If you uploaded the raw 512x512 PNG to the repo root, pad and upscale to 1024x1024
-            convert "brand.0skne4t7ee-cp.png" -resize 680x680 -background "#000000" -gravity center -extent 1024x1024 assets/icon.png
-            convert "brand.0skne4t7ee-cp.png" -resize 680x680 -background none -gravity center -extent 1024x1024 assets/icon-foreground.png
-          elif [ ! -f "assets/icon.png" ]; then
-            # Render the exact ZXC Stream logo directly at 1024x1024 with Android Adaptive safe-zone padding
-            cat << 'EOF' > zxc_logo.svg
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-            <g transform="translate(180, 180) scale(1.296875)">
-              <!-- Dark shadow crossbar -->
-              <polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/>
-              <!-- Main Red Z shape -->
-              <path d="M 42,52 L 502,52 Q 512,52 504,62 L 154,412 L 320,412 L 385,332 L 504,452 Q 512,460 500,460 L 12,460 Q 0,460 8,450 L 358,100 L 92,100 L 36,60 Q 32,52 42,52 Z" fill="#D60000"/>
-            </g>
-          </svg>
-          EOF
-            convert -background none zxc_logo.svg assets/icon-foreground.png
-            convert -background "#000000" zxc_logo.svg -flatten assets/icon.png
-          fi
-          # Create solid black background layer & 2732x2732 splash screen
-          convert -size 1024x1024 xc:"#000000" assets/icon-background.png
-          convert assets/icon.png -background "#000000" -gravity center -extent 2732x2732 assets/splash.png
-          cp assets/splash.png assets/splash-dark.png
+          node -e '
+          const fs = require("fs");
+          const sharp = require("sharp");
+          fs.mkdirSync("assets", { recursive: true });
+          const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><rect width="1024" height="1024" fill="#000000"/><g transform="translate(180, 180) scale(1.296875)"><polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/><path d="M 42,52 L 502,52 Q 512,52 504,62 L 154,412 L 320,412 L 385,332 L 504,452 Q 512,460 500,460 L 12,460 Q 0,460 8,450 L 358,100 L 92,100 L 36,60 Q 32,52 42,52 Z" fill="#D60000"/></g></svg>`;
+          const splashSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2732 2732" width="2732" height="2732"><rect width="2732" height="2732" fill="#000000"/><g transform="translate(1034, 1034) scale(1.296875)"><polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/><path d="M 42,52 L 502,52 Q 512,52 504,62 L 154,412 L 320,412 L 385,332 L 504,452 Q 512,460 500,460 L 12,460 Q 0,460 8,450 L 358,100 L 92,100 L 36,60 Q 32,52 42,52 Z" fill="#D60000"/></g></svg>`;
+          (async () => {
+            await sharp(Buffer.from(svg)).png().toFile("assets/icon.png");
+            await sharp(Buffer.from(svg)).png().toFile("assets/icon-foreground.png");
+            await sharp({ create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 1 } } }).png().toFile("assets/icon-background.png");
+            await sharp(Buffer.from(splashSvg)).png().toFile("assets/splash.png");
+            await sharp(Buffer.from(splashSvg)).png().toFile("assets/splash-dark.png");
+          })();
+          '
 
       - name: Generate Android Platform & Apply Icons
         run: |
@@ -60,10 +50,9 @@ jobs:
           npx capacitor-assets generate --android --iconBackgroundColor '#000000' --iconBackgroundColorDark '#000000' --splashBackgroundColor '#000000' --splashBackgroundColorDark '#000000'
           npx cap sync android
 
-      - name: Configure Fullscreen, Ad-Blocking & Video Support
+      - name: Configure Fullscreen & Video Support
         run: |
           sed -i 's/<application/<application android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
-          sed -i 's/android:configChanges="[^"]*"/android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"/g' android/app/src/main/AndroidManifest.xml
 
       - name: Build Debug APK with Gradle
         run: |
