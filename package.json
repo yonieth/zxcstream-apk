@@ -1,8 +1,9 @@
 {
   "name": "zxcstream-app",
   "version": "1.0.0",
-  "description": "ZXC Stream Android Wrapper",
-  "main": "index.js",
+  "description": "ZXC Stream Official App",
+  "author": "ZXC Stream",
+  "main": "electron-main.js",
   "dependencies": {
     "@capacitor/android": "^6.0.0",
     "@capacitor/cli": "^6.0.0",
@@ -10,6 +11,23 @@
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3",
     "sharp": "^0.33.0"
+  },
+  "build": {
+    "appId": "com.zxcstream.app",
+    "productName": "ZXC Stream",
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ZXC Stream"
+    }
   }
 }
