@@ -18,6 +18,10 @@
   "build": {
     "appId": "com.zxcstream.app",
     "productName": "ZXC Stream",
+    "files": [
+      "electron-main.js",
+      "assets/**/*"
+    ],
     "win": {
       "target": "nsis",
       "icon": "assets/icon.png"
