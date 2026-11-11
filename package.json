@@ -1,15 +1,12 @@
 {
-  "name": "zxcstream-app",
-  "version": "1.0.0",
-  "description": "ZXC Stream Official App",
-  "main": "index.js",
-  "dependencies": {
-    "@capacitor/android": "^6.0.0",
-    "@capacitor/cli": "^6.0.0",
-    "@capacitor/core": "^6.0.0"
+  "appId": "com.zxcstream.app",
+  "appName": "ZXC Stream",
+  "webDir": "www",
+  "server": {
+    "url": "https://zxcstream.com/",
+    "cleartext": true
   },
-  "devDependencies": {
-    "@capacitor/assets": "^3.0.5",
-    "sharp": "^0.33.0"
+  "android": {
+    "allowMixedContent": true
   }
 }
