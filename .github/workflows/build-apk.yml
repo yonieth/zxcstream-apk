@@ -109,7 +109,7 @@ jobs:
             "                    String url = request.getUrl().toString().toLowerCase();",
             "                    for (String adHost : AD_HOSTS) {",
             "                        if (url.contains(adHost)) {",
-            "                            return new WebResourceResponse(\"text/plain\", \"utf-8\", new ByteArrayInputStream(\"\".getBytes()));",
+            "                            return new WebResourceResponse(\"text/plain\", \"utf-8\", new ByteArrayInputStream(new byte[0]));",
             "                        }",
             "                    }",
             "                    return super.shouldInterceptRequest(view, request);",
@@ -118,9 +118,8 @@ jobs:
             "                @Override",
             "                public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {",
             "                    String url = request.getUrl().toString().toLowerCase();",
-            "                    // Only allow main top-level navigation to stay on zxcstream (embedded video iframes are still allowed!)",
             "                    if (request.isForMainFrame() && !url.contains(\"zxcstream.com\")) {",
-            "                        return true; // Block top-level ad redirects!",
+            "                        return true;",
             "                    }",
             "                    return super.shouldOverrideUrlLoading(view, request);",
             "                }",
@@ -128,13 +127,7 @@ jobs:
             "                @Override",
             "                public void onPageFinished(WebView view, String url) {",
             "                    super.onPageFinished(view, url);",
-            "                    // Inject JS to neutralize window.open and hide floating ad overlays",
-            "                    view.evaluateJavascript(",
-            "                        \"window.open = function() { return null; };\" +",
-            "                        \"setInterval(function() { \" +",
-            "                        \"  document.querySelectorAll(\\\"a[target=\x27_blank\x27], iframe[src*=\x27ads\x27], div[id*=\x27ads\x27], div[class*=\x27ads\x27]\\\").forEach(function(el) { el.remove(); });\" +",
-            "                        \"}, 1500);\", null",
-            "                    );",
+            "                    view.evaluateJavascript(\"window.open = function() { return null; };\", null);",
             "                }",
             "            });",
             "        }",
@@ -142,7 +135,6 @@ jobs:
             "",
             "    @Override",
             "    public void startActivity(Intent intent) {",
-            "        // Prevent any ad script from launching external Chrome browser",
             "        if (intent != null && Intent.ACTION_VIEW.equals(intent.getAction())) {",
             "            return;",
             "        }",
@@ -202,7 +194,7 @@ jobs:
           const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><rect width="1024" height="1024" fill="#000000" rx="180"/><g transform="translate(180, 180) scale(1.296875)"><polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/><path d="M 42,52 L 502,52 Q 512,52 504,62 L 154,412 L 320,412 L 385,332 L 504,452 Q 512,460 500,460 L 12,460 Q 0,460 8,450 L 358,100 L 92,100 L 36,60 Q 32,52 42,52 Z" fill="#D60000"/></g></svg>`;
 
           const mainJs = [
-            "const { app, BrowserWindow, session } = require(\"electron\");",
+            "const { app, BrowserWindow } = require(\"electron\");",
             "const path = require(\"path\");",
             "function createWindow() {",
             "  const win = new BrowserWindow({",
@@ -248,9 +240,10 @@ jobs:
 
           fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2));
 
-          sharp(Buffer.from(svg)).resize(512, 512).png().toFile("icon.png").then(() => {
+          (async () => {
+            await sharp(Buffer.from(svg)).resize(512, 512).png().toFile("icon.png");
             console.log("Icon ready");
-          });
+          })();
           '
 
       - name: Build Windows Setup .EXE with NSIS Wizard
