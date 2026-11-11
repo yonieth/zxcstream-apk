@@ -49,7 +49,7 @@ jobs:
           npx capacitor-assets generate --android --iconBackgroundColor '#000000' --iconBackgroundColorDark '#000000' --splashBackgroundColor '#000000' --splashBackgroundColorDark '#000000'
           npx cap sync android
 
-      - name: Inject Fullscreen, Auto-Rotation & Smart Ad-Blocker
+      - name: Inject Fullscreen, Auto-Rotation & Ad-Blocker
         run: |
           node -e '
           const fs = require("fs");
@@ -67,11 +67,11 @@ jobs:
             "import android.webkit.WebResourceResponse;",
             "import android.webkit.WebSettings;",
             "import android.webkit.WebView;",
+            "import android.webkit.WebViewClient;",
             "import androidx.core.view.WindowCompat;",
             "import androidx.core.view.WindowInsetsCompat;",
             "import androidx.core.view.WindowInsetsControllerCompat;",
             "import com.getcapacitor.BridgeActivity;",
-            "import com.getcapacitor.BridgeWebViewClient;",
             "import java.io.ByteArrayInputStream;",
             "import java.util.Arrays;",
             "import java.util.List;",
@@ -103,7 +103,7 @@ jobs:
             "            settings.setSupportMultipleWindows(false);",
             "            settings.setMediaPlaybackRequiresUserGesture(false);",
             "",
-            "            webView.setWebViewClient(new BridgeWebViewClient(this.bridge) {",
+            "            webView.setWebViewClient(new WebViewClient() {",
             "                @Override",
             "                public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {",
             "                    String url = request.getUrl().toString().toLowerCase();",
@@ -121,7 +121,7 @@ jobs:
             "                    if (request.isForMainFrame() && !url.contains(\"zxcstream.com\")) {",
             "                        return true;",
             "                    }",
-            "                    return super.shouldOverrideUrlLoading(view, request);",
+            "                    return false;",
             "                }",
             "",
             "                @Override",
@@ -180,18 +180,42 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Create Isolated Windows Electron Installer Project
+      - name: Create Isolated Windows Electron Project
         shell: bash
         run: |
-          mkdir -p win-app
+          mkdir -p win-app/build
           cd win-app
-          npm init -y
-          npm install --save-dev electron@30.0.0 electron-builder@24.13.3 sharp@0.33.0
           node -e '
           const fs = require("fs");
-          const sharp = require("sharp");
-
-          const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><rect width="1024" height="1024" fill="#000000" rx="180"/><g transform="translate(180, 180) scale(1.296875)"><polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/><path d="M 42,52 L 502,52 Q 512,52 504,62 L 154,412 L 320,412 L 385,332 L 504,452 Q 512,460 500,460 L 12,460 Q 0,460 8,450 L 358,100 L 92,100 L 36,60 Q 32,52 42,52 Z" fill="#D60000"/></g></svg>`;
+          const pkg = {
+            name: "zxcstream-desktop",
+            version: "1.0.0",
+            description: "ZXC Stream Official Windows App",
+            author: "ZXC Stream",
+            main: "main.js",
+            devDependencies: {
+              electron: "30.0.0",
+              "electron-builder": "24.13.3",
+              sharp: "0.33.0"
+            },
+            build: {
+              appId: "com.zxcstream.desktop",
+              productName: "ZXC Stream",
+              files: ["main.js"],
+              win: {
+                target: "nsis",
+                icon: "build/icon.png"
+              },
+              nsis: {
+                oneClick: false,
+                allowToChangeInstallationDirectory: true,
+                createDesktopShortcut: true,
+                createStartMenuShortcut: true,
+                shortcutName: "ZXC Stream"
+              }
+            }
+          };
+          fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2));
 
           const mainJs = [
             "const { app, BrowserWindow } = require(\"electron\");",
@@ -199,7 +223,7 @@ jobs:
             "function createWindow() {",
             "  const win = new BrowserWindow({",
             "    width: 1280, height: 800, backgroundColor: \"#000000\",",
-            "    title: \"ZXC Stream\", icon: path.join(__dirname, \"icon.png\"),",
+            "    title: \"ZXC Stream\",",
             "    autoHideMenuBar: true,",
             "    webPreferences: { nodeIntegration: false, contextIsolation: true }",
             "  });",
@@ -210,52 +234,9 @@ jobs:
             "app.whenReady().then(createWindow);",
             "app.on(\"window-all-closed\", () => { if (process.platform !== \"darwin\") app.quit(); });"
           ].join("\n");
-
           fs.writeFileSync("main.js", mainJs);
-
-          const pkg = {
-            name: "zxcstream-desktop",
-            version: "1.0.0",
-            description: "ZXC Stream Desktop App",
-            author: "ZXC Stream",
-            main: "main.js",
-            devDependencies: {
-              electron: "30.0.0",
-              "electron-builder": "24.13.3"
-            },
-            build: {
-              appId: "com.zxcstream.desktop",
-              productName: "ZXC Stream",
-              files: ["main.js", "icon.png", "package.json"],
-              win: { target: "nsis", icon: "icon.png" },
-              nsis: {
-                oneClick: false,
-                allowToChangeInstallationDirectory: true,
-                createDesktopShortcut: true,
-                createStartMenuShortcut: true,
-                shortcutName: "ZXC Stream"
-              }
-            }
-          };
-
-          fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2));
-
-          (async () => {
-            await sharp(Buffer.from(svg)).resize(512, 512).png().toFile("icon.png");
-            console.log("Icon ready");
-          })();
           '
-
-      - name: Build Windows Setup .EXE with NSIS Wizard
-        shell: bash
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-        run: |
-          cd win-app
-          npx electron-builder --win nsis --x64
-
-      - name: Upload Windows Setup Installer (.exe)
-        uses: actions/upload-artifact@v4
-        with:
-          name: ZXC-Stream-Windows-Installer
-          path: win-app/dist/*.exe
+          npm install
+          node -e '
+          const sharp = require("sharp");
+          const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><rect width="1024" height="1024" fill="#000000" rx="180"/><g transform="translate(180, 180) scale(1.296875)"><polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/><path d="M 42
