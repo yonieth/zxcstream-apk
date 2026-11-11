@@ -58,7 +58,7 @@ jobs:
           manifest = manifest.replace("android:name=\".MainActivity\"", "android:name=\".MainActivity\" android:screenOrientation=\"fullSensor\"");
           fs.writeFileSync("android/app/src/main/AndroidManifest.xml", manifest);
 
-          const javaCode = [
+          const javaLines = [
             "package com.zxcstream.app;",
             "import android.content.Intent;",
             "import android.os.Bundle;",
@@ -67,15 +67,14 @@ jobs:
             "import android.webkit.WebResourceResponse;",
             "import android.webkit.WebSettings;",
             "import android.webkit.WebView;",
-            "import android.webkit.WebViewClient;",
             "import androidx.core.view.WindowCompat;",
             "import androidx.core.view.WindowInsetsCompat;",
             "import androidx.core.view.WindowInsetsControllerCompat;",
             "import com.getcapacitor.BridgeActivity;",
+            "import com.getcapacitor.BridgeWebViewClient;",
             "import java.io.ByteArrayInputStream;",
             "import java.util.Arrays;",
             "import java.util.List;",
-            "",
             "public class MainActivity extends BridgeActivity {",
             "    private static final List<String> AD_HOSTS = Arrays.asList(",
             "        \"doubleclick.net\", \"googlesyndication.com\", \"googleadservices.com\",",
@@ -85,14 +84,12 @@ jobs:
             "        \"histats.com\", \"acint.net\", \"adtng.com\", \"a-ads.com\",",
             "        \"brightadnetwork.com\", \"onclickalgo.com\", \"pushame.com\", \"bet365\", \"1xbet\"",
             "    );",
-            "",
             "    @Override",
             "    public void onCreate(Bundle savedInstanceState) {",
             "        super.onCreate(savedInstanceState);",
             "        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);",
             "        hideSystemBars();",
             "    }",
-            "",
             "    @Override",
             "    public void onStart() {",
             "        super.onStart();",
@@ -102,8 +99,7 @@ jobs:
             "            settings.setJavaScriptCanOpenWindowsAutomatically(false);",
             "            settings.setSupportMultipleWindows(false);",
             "            settings.setMediaPlaybackRequiresUserGesture(false);",
-            "",
-            "            webView.setWebViewClient(new WebViewClient() {",
+            "            webView.setWebViewClient(new BridgeWebViewClient(this.bridge) {",
             "                @Override",
             "                public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {",
             "                    String url = request.getUrl().toString().toLowerCase();",
@@ -114,16 +110,14 @@ jobs:
             "                    }",
             "                    return super.shouldInterceptRequest(view, request);",
             "                }",
-            "",
             "                @Override",
             "                public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {",
             "                    String url = request.getUrl().toString().toLowerCase();",
             "                    if (request.isForMainFrame() && !url.contains(\"zxcstream.com\")) {",
             "                        return true;",
             "                    }",
-            "                    return false;",
+            "                    return super.shouldOverrideUrlLoading(view, request);",
             "                }",
-            "",
             "                @Override",
             "                public void onPageFinished(WebView view, String url) {",
             "                    super.onPageFinished(view, url);",
@@ -132,7 +126,6 @@ jobs:
             "            });",
             "        }",
             "    }",
-            "",
             "    @Override",
             "    public void startActivity(Intent intent) {",
             "        if (intent != null && Intent.ACTION_VIEW.equals(intent.getAction())) {",
@@ -140,13 +133,11 @@ jobs:
             "        }",
             "        super.startActivity(intent);",
             "    }",
-            "",
             "    @Override",
             "    public void onWindowFocusChanged(boolean hasFocus) {",
             "        super.onWindowFocusChanged(hasFocus);",
             "        if (hasFocus) hideSystemBars();",
             "    }",
-            "",
             "    private void hideSystemBars() {",
             "        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);",
             "        WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());",
@@ -156,8 +147,8 @@ jobs:
             "        }",
             "    }",
             "}"
-          ].join("\n");
-          fs.writeFileSync("android/app/src/main/java/com/zxcstream/app/MainActivity.java", javaCode);
+          ];
+          fs.writeFileSync("android/app/src/main/java/com/zxcstream/app/MainActivity.java", javaLines.join(String.fromCharCode(10)));
           '
 
       - name: Build Debug APK with Gradle
@@ -173,20 +164,20 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
   build-windows:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Create Isolated Windows Electron Project
-        shell: bash
+      - name: Build Windows NSIS Setup Installer (.exe)
         run: |
           mkdir -p win-app/build
           cd win-app
           node -e '
           const fs = require("fs");
+          const nl = String.fromCharCode(10);
           const pkg = {
             name: "zxcstream-desktop",
             version: "1.0.0",
@@ -217,14 +208,12 @@ jobs:
           };
           fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2));
 
-          const mainJs = [
+          const mainLines = [
             "const { app, BrowserWindow } = require(\"electron\");",
-            "const path = require(\"path\");",
             "function createWindow() {",
             "  const win = new BrowserWindow({",
             "    width: 1280, height: 800, backgroundColor: \"#000000\",",
-            "    title: \"ZXC Stream\",",
-            "    autoHideMenuBar: true,",
+            "    title: \"ZXC Stream\", autoHideMenuBar: true,",
             "    webPreferences: { nodeIntegration: false, contextIsolation: true }",
             "  });",
             "  win.maximize();",
@@ -233,10 +222,21 @@ jobs:
             "}",
             "app.whenReady().then(createWindow);",
             "app.on(\"window-all-closed\", () => { if (process.platform !== \"darwin\") app.quit(); });"
-          ].join("\n");
-          fs.writeFileSync("main.js", mainJs);
+          ];
+          fs.writeFileSync("main.js", mainLines.join(nl));
           '
           npm install
           node -e '
           const sharp = require("sharp");
-          const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><rect width="1024" height="1024" fill="#000000" rx="180"/><g transform="translate(180, 180) scale(1.296875)"><polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/><path d="M 42
+          const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><rect width="1024" height="1024" fill="#000000" rx="180"/><g transform="translate(180, 180) scale(1.296875)"><polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/><path d="M 42,52 L 502,52 Q 512,52 504,62 L 154,412 L 320,412 L 385,332 L 504,452 Q 512,460 500,460 L 12,460 Q 0,460 8,450 L 358,100 L 92,100 L 36,60 Q 32,52 42,52 Z" fill="#D60000"/></g></svg>`;
+          (async () => {
+            await sharp(Buffer.from(svg)).resize(512, 512).png().toFile("build/icon.png");
+          })();
+          '
+          CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --win nsis --x64
+
+      - name: Upload Windows Setup Installer (.exe)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZXC-Stream-Windows-Installer
+          path: win-app/dist/*.exe
