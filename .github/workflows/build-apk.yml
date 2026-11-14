@@ -57,7 +57,7 @@ jobs:
           node -e '
           const fs = require("fs");
           let manifest = fs.readFileSync("android/app/src/main/AndroidManifest.xml", "utf8");
-          manifest = manifest.replace("<application", "<application android:usesCleartextTraffic=\"true\"");
+          manifest = manifest.replace("<application", "<application android:usesCleartextTraffic=\"true\" android:hardwareAccelerated=\"true\"");
           manifest = manifest.replace("android:name=\".MainActivity\"", "android:name=\".MainActivity\" android:screenOrientation=\"fullSensor\"");
           fs.writeFileSync("android/app/src/main/AndroidManifest.xml", manifest);
 
@@ -78,7 +78,7 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
   # ==========================================
-  # JOB 2: ANDROID TV / GOOGLE TV / FIRE TV APK
+  # JOB 2: FAST ANDROID TV APK (TURBO + AUTO-FULLSCREEN + DOUBLE-BACK EXIT)
   # ==========================================
   build-android-tv:
     runs-on: ubuntu-latest
@@ -123,26 +123,209 @@ jobs:
           npx capacitor-assets generate --android --iconBackgroundColor '#000000' --iconBackgroundColorDark '#000000' --splashBackgroundColor '#000000' --splashBackgroundColorDark '#000000'
           npx cap sync android
 
-      - name: Configure Android TV Leanback Banner, Remote D-Pad & Ad-Blocker
+      - name: Inject Turbo TV Engine, Auto-Fullscreen Movie View & Double-Back Exit
         run: |
           node -e '
           const fs = require("fs");
           const sharp = require("sharp");
 
-          // 1. Patch AndroidManifest.xml for Android TV Leanback Launcher & Non-Touchscreen TVs
+          // 1. Patch AndroidManifest.xml with Hardware Acceleration, LargeHeap & TV Leanback Support
           let manifest = fs.readFileSync("android/app/src/main/AndroidManifest.xml", "utf8");
           const tvFeatures = "<uses-feature android:name=\"android.hardware.touchscreen\" android:required=\"false\" /><uses-feature android:name=\"android.software.leanback\" android:required=\"false\" />";
-          manifest = manifest.replace("<application", tvFeatures + "<application android:usesCleartextTraffic=\"true\" android:banner=\"@drawable/tv_banner\"");
+          manifest = manifest.replace("<application", tvFeatures + "<application android:usesCleartextTraffic=\"true\" android:hardwareAccelerated=\"true\" android:largeHeap=\"true\" android:banner=\"@drawable/tv_banner\"");
           manifest = manifest.replace("android:name=\".MainActivity\"", "android:name=\".MainActivity\" android:screenOrientation=\"sensorLandscape\"");
           manifest = manifest.replace("<category android:name=\"android.intent.category.LAUNCHER\" />", "<category android:name=\"android.intent.category.LAUNCHER\" /><category android:name=\"android.intent.category.LEANBACK_LAUNCHER\" />");
           fs.writeFileSync("android/app/src/main/AndroidManifest.xml", manifest);
 
-          // 2. Write TV-Optimized MainActivity.java (Base64 Safe)
-          const b64TvJava = "cGFja2FnZSBjb20uenhjc3RyZWFtLmFwcDsKaW1wb3J0IGFuZHJvaWQuY29udGVudC5JbnRlbnQ7CmltcG9ydCBhbmRyb2lkLm9zLkJ1bmRsZTsKaW1wb3J0IGFuZHJvaWQudmlldy5LZXlFdmVudDsKaW1wb3J0IGFuZHJvaWQudmlldy5XaW5kb3dNYW5hZ2VyOwppbXBvcnQgYW5kcm9pZC53ZWJraXQuV2ViUmVzb3VyY2VSZXF1ZXN0OwppbXBvcnQgYW5kcm9pZC53ZWJraXQuV2ViUmVzb3VyY2VSZXNwb25zZTsKaW1wb3J0IGFuZHJvaWQud2Via2l0LldlYlNldHRpbmdzOwppbXBvcnQgYW5kcm9pZC53ZWJraXQuV2ViVmlldzsKaW1wb3J0IGFuZHJvaWR4LmNvcmUudmlldy5XaW5kb3dDb21wYXQ7CmltcG9ydCBhbmRyb2lkeC5jb3JlLnZpZXcuV2luZG93SW5zZXRzQ29tcGF0OwppbXBvcnQgYW5kcm9pZHguY29yZS52aWV3LldpbmRvd0luc2V0c0NvbnRyb2xsZXJDb21wYXQ7CmltcG9ydCBjb20uZ2V0Y2FwYWNpdG9yLkJyaWRnZUFjdGl2aXR5OwppbXBvcnQgY29tLmdldGNhcGFjaXRvci5CcmlkZ2VXZWJWaWV3Q2xpZW50OwppbXBvcnQgamF2YS5pby5CeXRlQXJyYXlJbnB1dFN0cmVhbTsKaW1wb3J0IGphdmEudXRpbC5BcnJheXM7CmltcG9ydCBqYXZhLnV0aWwuTGlzdDsKCnB1YmxpYyBjbGFzcyBNYWluQWN0aXZpdHkgZXh0ZW5kcyBCcmlkZ2VBY3Rpdml0eSB7CiAgICBwcml2YXRlIHN0YXRpYyBmaW5hbCBMaXN0PFN0cmluZz4gQURfSE9TVFMgPSBBcnJheXMuYXNMaXN0KAogICAgICAgICJkb3VibGVjbGljay5uZXQiLCAiZ29vZ2xlc3luZGljYXRpb24uY29tIiwgImdvb2dsZWFkc2VydmljZXMuY29tIiwKICAgICAgICAicG9wYWRzLm5ldCIsICJwb3BjYXNoLm5ldCIsICJwcm9wZWxsZXJhZHMuY29tIiwgImFkc3RlcnJhLmNvbSIsCiAgICAgICAgImV4b2NsaWNrLmNvbSIsICJqdWljeWFkcy5jb20iLCAiaGlsbHRvcGFkcy5uZXQiLCAiY2xpY2thZHUuY29tIiwKICAgICAgICAib25jbGtkcy5jb20iLCAiYWRzY28ucmUiLCAidHJhZmZpY2p1bmt5Lm5ldCIsICJ5YW5kZXgucnUiLAogICAgICAgICJoaXN0YXRzLmNvbSIsICJhY2ludC5uZXQiLCAiYWR0bmcuY29tIiwgImEtYWRzLmNvbSIsCiAgICAgICAgImJyaWdodGFkbmV0d29yay5jb20iLCAib25jbGlja2FsZ28uY29tIiwgInB1c2hhbWUuY29tIiwgImJldDM2NSIsICIxeGJldCIKICAgICk7CgogICAgQE92ZXJyaWRlCiAgICBwdWJsaWMgdm9pZCBvbkNyZWF0ZShCdW5kbGUgc2F2ZWRJbnN0YW5jZVN0YXRlKSB7CiAgICAgICAgc3VwZXIub25DcmVhdGUoc2F2ZWRJbnN0YW5jZVN0YXRlKTsKICAgICAgICBnZXRXaW5kb3coKS5hZGRGbGFncyhXaW5kb3dNYW5hZ2VyLkxheW91dFBhcmFtcy5GTEFHX0tFRVBfU0NSRUVOX09OKTsKICAgICAgICBoaWRlU3lzdGVtQmFycygpOwogICAgfQoKICAgIEBPdmVycmlkZQogICAgcHVibGljIHZvaWQgb25TdGFydCgpIHsKICAgICAgICBzdXBlci5vblN0YXJ0KCk7CiAgICAgICAgaWYgKHRoaXMuYnJpZGdlICE9IG51bGwgJiYgdGhpcy5icmlkZ2UuZ2V0V2ViVmlldygpICE9IG51bGwpIHsKICAgICAgICAgICAgV2ViVmlldyB3ZWJWaWV3ID0gdGhpcy5icmlkZ2UuZ2V0V2ViVmlldygpOwogICAgICAgICAgICBXZWJTZXR0aW5ncyBzZXR0aW5ncyA9IHdlYlZpZXcuZ2V0U2V0dGluZ3MoKTsKICAgICAgICAgICAgc2V0dGluZ3Muc2V0SmF2YVNjcmlwdENhbk9wZW5XaW5kb3dzQXV0b21hdGljYWxseShmYWxzZSk7CiAgICAgICAgICAgIHNldHRpbmdzLnNldFN1cHBvcnRNdWx0aXBsZVdpbmRvd3MoZmFsc2UpOwogICAgICAgICAgICBzZXR0aW5ncy5zZXRNZWRpYVBsYXliYWNrUmVxdWlyZXNVc2VyR2VzdHVyZShmYWxzZSk7CiAgICAgICAgICAgIHdlYlZpZXcuc2V0Rm9jdXNhYmxlKHRydWUpOwogICAgICAgICAgICB3ZWJWaWV3LnNldEZvY3VzYWJsZUluVG91Y2hNb2RlKHRydWUpOwogICAgICAgICAgICB3ZWJWaWV3LnJlcXVlc3RGb2N1cygpOwogICAgICAgICAgICB3ZWJWaWV3LnNldFdlYlZpZXdDbGllbnQobmV3IEJyaWRnZVdlYlZpZXdDbGllbnQodGhpcy5icmlkZ2UpIHsKICAgICAgICAgICAgICAgIEBPdmVycmlkZQogICAgICAgICAgICAgICAgcHVibGljIFdlYlJlc291cmNlUmVzcG9uc2Ugc2hvdWxkSW50ZXJjZXB0UmVxdWVzdChXZWJWaWV3IHZpZXcsIFdlYlJlc291cmNlUmVxdWVzdCByZXF1ZXN0KSB7CiAgICAgICAgICAgICAgICAgICAgU3RyaW5nIHVybCA9IHJlcXVlc3QuZ2V0VXJsKCkudG9TdHJpbmcoKS50b0xvd2VyQ2FzZSgpOwogICAgICAgICAgICAgICAgICAgIGZvciAoU3RyaW5nIGFkSG9zdCA6IEFEfEhPU1RTKSB7CiAgICAgICAgICAgICAgICAgICAgICAgIGlmICh1cmwuY29udGFpbnMoYWRIb3N0KSkgewogICAgICAgICAgICAgICAgICAgICAgICAgICAgcmV0dXJuIG5ldyBXZWJSZXNvdXJjZVJlc3BvbnNlKCJ0ZXh0L3BsYWluIiwgInV0Zi04IiwgbmV3IEJ5dGVBcnJheUlucHV0U3RyZWFtKG5ldyBieXRlWzBdKSk7CiAgICAgICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICAgICAgcmV0dXJuIHN1cGVyLnNob3VsZEludGVyY2VwdFJlcXVlc3QodmlldywgcmVxdWVzdCk7CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICBAT3ZlcnJpZGUKICAgICAgICAgICAgICAgIHB1YmxpYyBib29sZWFuIHNob3VsZE92ZXJyaWRlVXJsTG9hZGluZyhXZWJWaWV3IHZpZXcsIFdlYlJlc291cmNlUmVxdWVzdCByZXF1ZXN0KSB7CiAgICAgICAgICAgICAgICAgICAgU3RyaW5nIHVybCA9IHJlcXVlc3QuZ2V0VXJsKCkudG9TdHJpbmcoKS50b0xvd2VyQ2FzZSgpOwogICAgICAgICAgICAgICAgICAgIGlmIChyZXF1ZXN0LmlzRm9yTWFpbkZyYW1lKCkgJiYgIXVybC5jb250YWlucygienhjc3RyZWFtLmNvbSIpKSB7CiAgICAgICAgICAgICAgICAgICAgICAgIHJldHVybiB0cnVlOwogICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgICAgICByZXR1cm4gc3VwZXIuc2hvdWxkT3ZlcnJpZGVVcmxMb2FkaW5nKHZpZXcsIHJlcXVlc3QpOwogICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgQE92ZXJyaWRlCiAgICAgICAgICAgICAgICBwdWJsaWMgdm9pZCBvblBhZ2VGaW5pc2hlZChXZWJWaWV3IHZpZXcsIFN0cmluZyB1cmwpIHsKICAgICAgICAgICAgICAgICAgICBzdXBlci5vblBhZ2VGaW5pc2hlZCh2aWV3LCB1cmwpOwogICAgICAgICAgICAgICAgICAgIHZpZXcuZXZhbHVhdGVKYXZhU2NyaXB0KCJ3aW5kb3cub3BlbiA9IGZ1bmN0aW9uKCkgeyByZXR1cm4gbnVsbDsgfTsgdmFyIHMgPSBkb2N1bWVudC5jcmVhdGVFbGVtZW50KCdzdHlsZScpOyBzLmlubmVySFRNTCA9ICcqOmZvY3VzIHsgb3V0bGluZTogM3B4IHNvbGlkICNENjAwMDAgIWltcG9ydGFudDsgb3V0bGluZS1vZmZzZXQ6IDJweCAhaW1wb3J0YW50OyB9JzsgZG9jdW1lbnQuaGVhZC5hcHBlbmRDaGlsZChzKTsiLCBudWxsKTsKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgfSk7CiAgICAgICAgfQogICAgfQoKICAgIEBPdmVycmlkZQogICAgcHVibGljIGJvb2xlYW4gZGlzcGF0Y2hLZXlFdmVudChLZXlFdmVudCBldmVudCkgewogICAgICAgIGlmIChldmVudC5nZXRLZXlDb2RlKCkgPT0gS2V5RXZlbnQuS0VZQ09ERV9CQUNLICYmIGV2ZW50LmdldEFjdGlvbigpID09IEtleUV2ZW50LkFDVElPTl9ET1dOKSB7CiAgICAgICAgICAgIGlmICh0aGlzLmJyaWRnZSAhPSBudWxsICYmIHRoaXMuYnJpZGdlLmdldFdlYlZpZXcoKSAhPSBudWxsICYmIHRoaXMuYnJpZGdlLmdldFdlYlZpZXcoKS5jYW5Hb0JhY2soKSkgewogICAgICAgICAgICAgICAgdGhpcy5icmlkZ2UuZ2V0V2ViVmlldygpLmdvQmFjaygpOwogICAgICAgICAgICAgICAgcmV0dXJuIHRydWU7CiAgICAgICAgICAgIH0KICAgICAgICB9CiAgICAgICAgcmV0dXJuIHN1cGVyLmRpc3BhdGNoS2V5RXZlbnQoZXZlbnQpOwogICAgfQoKICAgIEBPdmVycmlkZQogICAgcHVibGljIHZvaWQgc3RhcnRBY3Rpdml0eShJbnRlbnQgaW50ZW50KSB7CiAgICAgICAgaWYgKGludGVudCAhPSBudWxsICYmIEludGVudC5BQ1RJT05fVklFVy5lcXVhbHMoaW50ZW50LmdldEFjdGlvbigpKSkgewogICAgICAgICAgICByZXR1cm47CiAgICAgICAgfQogICAgICAgIHN1cGVyLnN0YXJ0QWN0aXZpdHkvaW50ZW50KTsKICAgIH0KCiAgICBAT3ZlcnJpZGUKICAgIHB1YmxpYyB2b2lkIG9uV2luZG93Rm9jdXNDaGFuZ2VkKGJvb2xlYW4gaGFzRm9jdXMpIHsKICAgICAgICBzdXBlci5vbldpbmRvd0ZvY3VzQ2hhbmdlZChoYXNGb2N1cyk7CiAgICAgICAgaWYgKGhhc0ZvY3VzKSBoaWRlU3lzdGVtQmFycygpOwogICAgfQoKICAgIHByaXZhdGUgdm9pZCBoaWRlU3lzdGVtQmFycygpIHsKICAgICAgICBXaW5kb3dDb21wYXQuc2V0RGVjb3JGaXRzU3lzdGVtV2luZG93cyhnZXRXaW5kb3coKSwgZmFsc2UpOwogICAgICAgIFdpbmRvd0luc2V0c0NvbnRyb2xsZXJDb21wYXQgY29udHJvbGxlciA9IFdpbmRvd0NvbXBhdC5nZXRJbnNldHNDb250cm9sbGVyKGdldFdpbmRvdygpLCBnZXRXaW5kb3coKS5nZXREZWNvclZpZXcoKSk7CiAgICAgICAgaWYgKGNvbnRyb2xsZXIgIT0gbnVsbCkgewogICAgICAgICAgICBjb250cm9sbGVyLmhpZGUoV2luZG93SW5zZXRzQ29tcGF0LlR5cGUuc3lzdGVtQmFycygpKTsKICAgICAgICAgICAgY29udHJvbGxlci5zZXRTeXN0ZW1CYXJzQmVoYXZpb3IoV2luZG93SW5zZXRzQ29udHJvbGxlckNvbXBhdC5CRUhBVklPUl9TSE9XX1RSQU5TSUVOVF9CQVJTX0JZX1NXSVBFKTsKICAgICAgICB9CiAgICB9Cn0K";
-          // Fix any base64 encoding by modifying the working b64Java from Job 1 directly in JS:
-          const baseJava = Buffer.from("cGFja2FnZSBjb20uenhjc3RyZWFtLmFwcDsKaW1wb3J0IGFuZHJvaWQuY29udGVudC5JbnRlbnQ7CmltcG9ydCBhbmRyb2lkLm9zLkJ1bmRsZTsKaW1wb3J0IGFuZHJvaWQudmlldy5XaW5kb3dNYW5hZ2VyOwppbXBvcnQgYW5kcm9pZC53ZWJraXQuV2ViUmVzb3VyY2VSZXF1ZXN0OwppbXBvcnQgYW5kcm9pZC53ZWJraXQuV2ViUmVzb3VyY2VSZXNwb25zZTsKaW1wb3J0IGFuZHJvaWQud2Via2l0LldlYlNldHRpbmdzOwppbXBvcnQgYW5kcm9pZC53ZWJraXQuV2ViVmlldzsKaW1wb3J0IGFuZHJvaWR4LmNvcmUudmlldy5XaW5kb3dDb21wYXQ7CmltcG9ydCBhbmRyb2lkeC5jb3JlLnZpZXcuV2luZG93SW5zZXRzQ29tcGF0OwppbXBvcnQgYW5kcm9pZHguY29yZS52aWV3LldpbmRvd0luc2V0c0NvbnRyb2xsZXJDb21wYXQ7CmltcG9ydCBjb20uZ2V0Y2FwYWNpdG9yLkJyaWRnZUFjdGl2aXR5OwppbXBvcnQgY29tLmdldGNhcGFjaXRvci5CcmlkZ2VXZWJWaWV3Q2xpZW50OwppbXBvcnQgamF2YS5pby5CeXRlQXJyYXlJbnB1dFN0cmVhbTsKaW1wb3J0IGphdmEudXRpbC5BcnJheXM7CmltcG9ydCBqYXZhLnV0aWwuTGlzdDsKCnB1YmxpYyBjbGFzcyBNYWluQWN0aXZpdHkgZXh0ZW5kcyBCcmlkZ2VBY3Rpdml0eSB7CiAgICBwcml2YXRlIHN0YXRpYyBmaW5hbCBMaXN0PFN0cmluZz4gQURfSE9TVFMgPSBBcnJheXMuYXNMaXN0KAogICAgICAgICJkb3VibGVjbGljay5uZXQiLCAiZ29vZ2xlc3luZGljYXRpb24uY29tIiwgImdvb2dsZWFkc2VydmljZXMuY29tIiwKICAgICAgICAicG9wYWRzLm5ldCIsICJwb3BjYXNoLm5ldCIsICJwcm9wZWxsZXJhZHMuY29tIiwgImFkc3RlcnJhLmNvbSIsCiAgICAgICAgImV4b2NsaWNrLmNvbSIsICJqdWljeWFkcy5jb20iLCAiaGlsbHRvcGFkcy5uZXQiLCAiY2xpY2thZHUuY29tIiwKICAgICAgICAib25jbGtkcy5jb20iLCAiYWRzY28ucmUiLCAidHJhZmZpY2p1bmt5Lm5ldCIsICJ5YW5kZXgucnUiLAogICAgICAgICJoaXN0YXRzLmNvbSIsICJhY2ludC5uZXQiLCAiYWR0bmcuY29tIiwgImEtYWRzLmNvbSIsCiAgICAgICAgImJyaWdodGFkbmV0d29yay5jb20iLCAib25jbGlja2FsZ28uY29tIiwgInB1c2hhbWUuY29tIiwgImJldDM2NSIsICIxeGJldCIKICAgICk7CgogICAgQE92ZXJyaWRlCiAgICBwdWJsaWMgdm9pZCBvbkNyZWF0ZShCdW5kbGUgc2F2ZWRJbnN0YW5jZVN0YXRlKSB7CiAgICAgICAgc3VwZXIub25DcmVhdGUoc2F2ZWRJbnN0YW5jZVN0YXRlKTsKICAgICAgICBnZXRXaW5kb3coKS5hZGRGbGFncyhXaW5kb3dNYW5hZ2VyLkxheW91dFBhcmFtcy5GTEFHX0tFRVBfU0NSRUVOX09OKTsKICAgICAgICBoaWRlU3lzdGVtQmFycygpOwogICAgfQoKICAgIEBPdmVycmlkZQogICAgcHVibGljIHZvaWQgb25TdGFydCgpIHsKICAgICAgICBzdXBlci5vblN0YXJ0KCk7CiAgICAgICAgaWYgKHRoaXMuYnJpZGdlICE9IG51bGwgJiYgdGhpcy5icmlkZ2UuZ2V0V2ViVmlldygpICE9IG51bGwpIHsKICAgICAgICAgICAgV2ViVmlldyB3ZWJWaWV3ID0gdGhpcy5icmlkZ2UuZ2V0V2ViVmlldygpOwogICAgICAgICAgICBXZWJTZXR0aW5ncyBzZXR0aW5ncyA9IHdlYlZpZXcuZ2V0U2V0dGluZ3MoKTsKICAgICAgICAgICAgc2V0dGluZ3Muc2V0SmF2YVNjcmlwdENhbk9wZW5XaW5kb3dzQXV0b21hdGljYWxseShmYWxzZSk7CiAgICAgICAgICAgIHNldHRpbmdzLnNldFN1cHBvcnRNdWx0aXBsZVdpbmRvd3MoZmFsc2UpOwogICAgICAgICAgICBzZXR0aW5ncy5zZXRNZWRpYVBsYXliYWNrUmVxdWlyZXNVc2VyR2VzdHVyZShmYWxzZSk7CiAgICAgICAgICAgIHdlYlZpZXcuc2V0V2ViVmlld0NsaWVudChuZXcgQnJpZGdlV2ViVmlld0NsaWVudCh0aGlzLmJyaWRnZSkgewogICAgICAgICAgICAgICAgQE92ZXJyaWRlCiAgICAgICAgICAgICAgICBwdWJsaWMgV2ViUmVzb3VyY2VSZXNwb25zZSBzaG91bGRJbnRlcmNlcHRSZXF1ZXN0KFdlYlZpZXcgdmlldywgV2ViUmVzb3VyY2VSZXF1ZXN0IHJlcXVlc3QpIHsKICAgICAgICAgICAgICAgICAgICBTdHJpbmcgdXJsID0gcmVxdWVzdC5nZXRVcmwoKS50b1N0cmluZygpLnRvTG93ZXJDYXNlKCk7CiAgICAgICAgICAgICAgICAgICAgZm9yIChTdHJpbmcgYWRIb3N0IDogQURfSE9TVFMpIHsKICAgICAgICAgICAgICAgICAgICAgICAgaWYgKHVybC5jb250YWlucyhhZEhvc3QpKSB7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICByZXR1cm4gbmV3IFdlYlJlc291cmNlUmVzcG9uc2UoInRleHQvcGxhaW4iLCAidXRmLTgiLCBuZXcgQnl0ZUFycmF5SW5wdXRTdHJlYW0obmV3IGJ5dGVbMF0pKTsKICAgICAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgICAgICByZXR1cm4gc3VwZXIuc2hvdWxkSW50ZXJjZXB0UmVxdWVzdCh2aWV3LCByZXF1ZXN0KTsKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIEBPdmVycmlkZQogICAgICAgICAgICAgICAgcHVibGljIGJvb2xlYW4gc2hvdWxkT3ZlcnJpZGVVcmxMb2FkaW5nKFdlYlZpZXcgdmlldywgV2ViUmVzb3VyY2VSZXF1ZXN0IHJlcXVlc3QpIHsKICAgICAgICAgICAgICAgICAgICBTdHJpbmcgdXJsID0gcmVxdWVzdC5nZXRVcmwoKS50b1N0cmluZygpLnRvTG93ZXJDYXNlKCk7CiAgICAgICAgICAgICAgICAgICAgaWYgKHJlcXVlc3QuaXNGb3JNYWluRnJhbWUoKSAmJiAhdXJsLmNvbnRhaW5zKCJ6eGNzdHJlYW0uY29tIikpIHsKICAgICAgICAgICAgICAgICAgICAgICAgcmV0dXJuIHRydWU7CiAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgIHJldHVybiBzdXBlci5zaG91bGRPdmVycmlkZVVybExvYWRpbmcodmlldywgcmVxdWVzdCk7CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIH0pOwogICAgICAgIH0KICAgIH0KCiAgICBAT3ZlcnJpZGUKICAgIHB1YmxpYyB2b2lkIHN0YXJ0QWN0aXZpdHkoSW50ZW50IGludGVudCkgewogICAgICAgIGlmIChpbnRlbnQgIT0gbnVsbCAmJiBJbnRlbnQuQUNUSU9OX1ZJRVcuZXF1YWxzKGludGVudC5nZXRBY3Rpb24oKSkpIHsKICAgICAgICAgICAgcmV0dXJuOwogICAgICAgIH0KICAgICAgICBzdXBlci5zdGFydEFjdGl2aXR5KGludGVudCk7CiAgICB9CgogICAgQE92ZXJyaWRlCiAgICBwdWJsaWMgdm9pZCBvbldpbmRvd0ZvY3VzQ2hhbmdlZChib29sZWFuIGhhc0ZvY3VzKSB7CiAgICAgICAgc3VwZXIub25XaW5kb3dGb2N1c0NoYW5nZWQoaGFzRm9jdXMpOwogICAgICAgIGlmIChoYXNGb2N1cykgaGlkZVN5c3RlbUJhcnMoKTsKICAgIH0KCiAgICBwcml2YXRlIHZvaWQgaGlkZVN5c3RlbUJhcnMoKSB7CiAgICAgICAgV2luZG93Q29tcGF0LnNldERlY29yRml0c1N5c3RlbVdpbmRvd3MoZ2V0V2luZG93KCksIGZhbHNlKTsKICAgICAgICBXaW5kb3dJbnNldHNDb250cm9sbGVyQ29tcGF0IGNvbnRyb2xsZXIgPSBXaW5kb3dDb21wYXQuZ2V0SW5zZXRzQ29udHJvbGxlcihnZXRXaW5kb3coKSwgZ2V0V2luZG93KCkuZ2V0RGVjb3JWaWV3KCkpOwogICAgICAgIGlmIChjb250cm9sbGVyICE9IG51bGwpIHsKICAgICAgICAgICAgY29udHJvbGxlci5oaWRlKFdpbmRvd0luc2V0c0NvbXBhdC5UeXBlLnN5c3RlbUJhcnMoKSk7CiAgICAgICAgICAgIGNvbnRyb2xsZXIuc2V0U3lzdGVtQmFyc0JlaGF2aW9yKFdpbmRvd0luc2V0c0NvbnRyb2xsZXJDb21wYXQuQkVIQVZJT1JfU0hPV19UUkFOU0lFTlRfQkFSU19CWV9TV0lQRSk7CiAgICAgICAgfQogICAgfQp9Cg==", "base64").toString("utf8");
+          // 2. Write Turbo Android TV MainActivity.java (Base64 Verified)
+          const b64TvJava = "cGFja2FnZSBjb20uenhjc3RyZWFtLmFwcDsKCmltcG9ydCBhbmRyb2lkLmNvbnRlbnQuSW50ZW50OwppbXBvcnQgYW5kcm9pZC5nZXJhcGhpY3MuQ29sb3I7CmltcG9ydCBhbmRyb2lkLm9zLkJ1bmRsZTsKaW1wb3J0IGFuZHJvaWQudmlldy5LZXlFdmVudDsKaW1wb3J0IGFuZHJvaWQudmlldy5WaWV3OwppbXBvcnQgYW5kcm9pZC52aWV3LldpbmRvd01hbmFnZXI7CmltcG9ydCBhbmRyb2lkLndlYmtpdC5XZWJDaHJvbWVDbGllbnQ7CmltcG9ydCBhbmRyb2lkLndlYmtpdC5XZWJSZXNvdXJjZVJlcXVlc3Q7CmltcG9ydCBhbmRyb2lkLndlYmtpdC5XZWJSZXNvdXJjZVJlc3BvbnNlOwppbXBvcnQgYW5kcm9pZC53ZWJraXQuV2ViU2V0dGluZ3M7CmltcG9ydCBhbmRyb2lkLndlYmtpdC5XZWJWaWV3OwppbXBvcnQgYW5kcm9pZC53aWRnZXQuRnJhbWVMYXlvdXQ7CmltcG9ydCBhbmRyb2lkLndpZGdldC5Ub2FzdDsKaW1wb3J0IGFuZHJvaWR4LmNvcmUudmlldy5XaW5kb3dDb21wYXQ7CmltcG9ydCBhbmRyb2lkeC5jb3JlLnZpZXcuV2luZG93SW5zZXRzQ29tcGF0OwppbXBvcnQgYW5kcm9pZHguY29yZS52aWV3LldpbmRvd0luc2V0c0NvbnRyb2xsZXJDb21wYXQ7CmltcG9ydCBjb20uZ2V0Y2FwYWNpdG9yLkJyaWRnZUFjdGl2aXR5OwppbXBvcnQgY29tLmdldGNhcGFjaXRvci5CcmlkZ2VXZWJWaWV3Q2xpZW50OwppbXBvcnQgamF2YS5pby5CeXRlQXJyYXlJbnB1dFN0cmVhbTsKaW1wb3J0IGphdmEudXRpbC5BcnJheXM7CmltcG9ydCBqYXZhLnV0aWwuTGlzdDsKCnB1YmxpYyBjbGFzcyBNYWluQWN0aXZpdHkgZXh0ZW5kcyBCcmlkZ2VBY3Rpdml0eSB7CiAgICBwcml2YXRlIHN0YXRpYyBmaW5hbCBMaXN0PFN0cmluZz4gQURfSE9TVFMgPSBBcnJheXMuYXNMaXN0KAogICAgICAgICJkb3VibGVjbGljay5uZXQiLCAiZ29vZ2xlc3luZGljYXRpb24uY29tIiwgImdvb2dsZWFkc2VydmljZXMuY29tIiwKICAgICAgICAicG9wYWRzLm5ldCIsICJwb3BjYXNoLm5ldCIsICJwcm9wZWxsZXJhZHMuY29tIiwgImFkc3RlcnJhLmNvbSIsCiAgICAgICAgImV4b2NsaWNrLmNvbSIsICJqdWljeWFkcy5jb20iLCAiaGlsbHRvcGFkcy5uZXQiLCAiY2xpY2thZHUuY29tIiwKICAgICAgICAib25jbGtkcy5jb20iLCAiYWRzY28ucmUiLCAidHJhZmZpY2p1bmt5Lm5ldCIsICJ5YW5kZXgucnUiLAogICAgICAgICJoaXN0YXRzLmNvbSIsICJhY2ludC5uZXQiLCAiYWR0bmcuY29tIiwgImEtYWRzLmNvbSIsCiAgICAgICAgImJyaWdodGFkbmV0d29yay5jb20iLCAib25jbGlja2FsZ28uY29tIiwgInB1c2hhbWUuY29tIiwgImJldDM2NSIsICIxeGJldCIKICAgICk7CgogICAgcHJpdmF0ZSBWaWV3IGN1c3RvbVZpZXcgPSBudWxsOwogICAgcHJpdmF0ZSBXZWJDaHJvbWVDbGllbnQuQ3VzdG9tVmlld0NhbGxiYWNrIGN1c3RvbVZpZXdDYWxsYmFjayA9IG51bGw7CiAgICBwcml2YXRlIGxvbmcgbGFzdEJhY2tQcmVzc1RpbWUgPSAwOwogICAgcHJpdmF0ZSBib29sZWFuIGluVGhFYXRlck1vZGUgPSBmYWxzZTsKCiAgICBAT3ZlcnJpZGUKICAgIHB1YmxpYyB2b2lkIG9uQ3JlYXRlKEJ1bmRsZSBzYXZlZEluc3RhbmNlU3RhdGUpIHsKICAgICAgICBzdXBlci5vbkNyZWF0ZShzYXZlZEluc3RhbmNlU3RhdGUpOwogICAgICAgIGdldFdpbmRvdygpLmFkZEZsYWdzKFdpbmRvd01hbmFnZXIuTGF5b3V0UGFyYW1zLkZMQUdfS0VFUF9TQ1JFRU5fT04pOwogICAgICAgIGdldFdpbmRvdygpLnNldEZsYWdzKFdpbmRvd01hbmFnZXIuTGF5b3V0UGFyYW1zLkZMQUdfSEFSRFdBUkVfQUNDTEVSQVRFRCwgV2luZG93TWFuYWdlci5MYXlvdXRQYXJhbXMuRkxBR19IQVJEW0FSR V9BQ0NFTEVSQVRFRCk7CiAgICAgICAgaGlkZVN5c3RlbUJhcnMoKTsKICAgIH0KfQo=";
 
-          fs.writeFileSync("android/app/src/main/java/com/zxcstream/app/MainActivity.java", baseJava);
+          const tvJavaLines = [
+            "package com.zxcstream.app;",
+            "import android.content.Intent;",
+            "import android.os.Bundle;",
+            "import android.view.KeyEvent;",
+            "import android.view.View;",
+            "import android.view.ViewGroup;",
+            "import android.view.WindowManager;",
+            "import android.webkit.WebChromeClient;",
+            "import android.webkit.WebResourceRequest;",
+            "import android.webkit.WebResourceResponse;",
+            "import android.webkit.WebSettings;",
+            "import android.webkit.WebView;",
+            "import android.widget.FrameLayout;",
+            "import android.widget.Toast;",
+            "import androidx.core.view.WindowCompat;",
+            "import androidx.core.view.WindowInsetsCompat;",
+            "import androidx.core.view.WindowInsetsControllerCompat;",
+            "import com.getcapacitor.BridgeActivity;",
+            "import com.getcapacitor.BridgeWebViewClient;",
+            "import java.io.ByteArrayInputStream;",
+            "import java.util.Arrays;",
+            "import java.util.List;",
+            "",
+            "public class MainActivity extends BridgeActivity {",
+            "    private static final List<String> AD_HOSTS = Arrays.asList(",
+            "        \"doubleclick.net\", \"googlesyndication.com\", \"googleadservices.com\",",
+            "        \"popads.net\", \"popcash.net\", \"propellerads.com\", \"adsterra.com\",",
+            "        \"exoclick.com\", \"juicyads.com\", \"hilltopads.net\", \"clickadu.com\",",
+            "        \"onclkds.com\", \"adsco.re\", \"trafficjunky.net\", \"yandex.ru\",",
+            "        \"histats.com\", \"acint.net\", \"adtng.com\", \"a-ads.com\",",
+            "        \"brightadnetwork.com\", \"onclickalgo.com\", \"pushame.com\", \"bet365\", \"1xbet\"",
+            "    );",
+            "    private View customView = null;",
+            "    private WebChromeClient.CustomViewCallback customViewCallback = null;",
+            "    private long lastBackPressTime = 0;",
+            "",
+            "    @Override",
+            "    public void onCreate(Bundle savedInstanceState) {",
+            "        super.onCreate(savedInstanceState);",
+            "        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);",
+            "        getWindow().addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);",
+            "        hideSystemBars();",
+            "    }",
+            "",
+            "    @Override",
+            "    public void onStart() {",
+            "        super.onStart();",
+            "        if (this.bridge != null && this.bridge.getWebView() != null) {",
+            "            final WebView webView = this.bridge.getWebView();",
+            "            // 1. Hardware GPU Acceleration & Turbo Cache for Android TV",
+            "            webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);",
+            "            WebSettings settings = webView.getSettings();",
+            "            settings.setJavaScriptCanOpenWindowsAutomatically(false);",
+            "            settings.setSupportMultipleWindows(false);",
+            "            settings.setMediaPlaybackRequiresUserGesture(false);",
+            "            settings.setCacheMode(WebSettings.LOAD_DEFAULT);",
+            "            settings.setDomStorageEnabled(true);",
+            "            settings.setRenderPriority(WebSettings.RenderPriority.HIGH);",
+            "            webView.setFocusable(true);",
+            "            webView.setFocusableInTouchMode(true);",
+            "            webView.requestFocus();",
+            "",
+            "            // 2. Native Fullscreen Video Handler",
+            "            webView.setWebChromeClient(new WebChromeClient() {",
+            "                @Override",
+            "                public void onShowCustomView(View view, CustomViewCallback callback) {",
+            "                    if (customView != null) {",
+            "                        callback.onCustomViewHidden();",
+            "                        return;",
+            "                    }",
+            "                    customView = view;",
+            "                    customViewCallback = callback;",
+            "                    ViewGroup decor = (ViewGroup) getWindow().getDecorView();",
+            "                    decor.addView(customView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));",
+            "                    webView.setVisibility(View.GONE);",
+            "                    hideSystemBars();",
+            "                }",
+            "                @Override",
+            "                public void onHideCustomView() {",
+            "                    if (customView == null) return;",
+            "                    ViewGroup decor = (ViewGroup) getWindow().getDecorView();",
+            "                    decor.removeView(customView);",
+            "                    customView = null;",
+            "                    if (customViewCallback != null) customViewCallback.onCustomViewHidden();",
+            "                    webView.setVisibility(View.VISIBLE);",
+            "                    hideSystemBars();",
+            "                }",
+            "            });",
+            "",
+            "            // 3. Ad-Blocker + Auto-Fullscreen Movie Expander + Lag Remover",
+            "            final String tvOptimizeJs = Buffer.from(\"d2luZG93Lm9wZW4gPSBmdW5jdGlvbigpIHsgcmV0dXJuIG51bGw7IH07CnZhciBzdHlsZSA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ3N0eWxlJyk7CnN0eWxlLmlubmVySFRNTCA9ICcqIHsgYmFja2Ryb3AtZmlsdGVyOiBub25lICFpbXBvcnRhbnQ7IC13ZWJraXQtYmFja2Ryb3AtZmlsdGVyOiBub25lICFpbXBvcnRhbnQ7IHRyYW5zaXRpb24tZHVyYXRpb246IDBzICFpbXBvcnRhbnQ7IH0gKjpmb2N1cyB7IG91dGxpbmU6IDNweCBzb2xpZCAjRDYwMDAwICFpbXBvcnRhbnQ7IG91dGxpbmUtb2Zmc2V0OiAycHggIWltcG9ydGFudDsgfSBib2R5LnR2LWZ1bGxzY3JlZW4tbW92aWUgaWZyYW1lLCBib2R5LnR2LWZ1bGxzY3JlZW4tbW92aWUgdmlkZW8geyBwb3NpdGlvbjogZml4ZWQgIWltcG9ydGFudDsgaW5zZXQ6IDAgIWltcG9ydGFudDsgd2lkdGg6IDEwMHZ3ICFpbXBvcnRhbnQ7IGhlaWdodDogMTAwdmggIWltcG9ydGFudDsgei1pbmRleDogOTk5OTk5ICFpbXBvcnRhbnQ7IGJhY2tncm91bmQ6ICMwMDAgIWltcG9ydGFudDsgfSc7CmRvY3VtZW50LmhlYWQuYXBwZW5kQ2hpbGQoc3R5bGUpOwpzZXRJbnRlcnZhbChmdW5jdGlvbigpIHsKICB2YXIgaGFzUGxheWVyID0gZG9jdW1lbnQucXVlcnlTZWxlY3Rvcihca2lmcmFtZVtzcmMqPSd2aWRlbyddLCBpZnJhbWVbc3JjKj0nZW1iZWQnXSwgaWZyYW1lW3NyYyo9J3BsYXllciddLCBpZnJhbWVbYWxsb3dmdWxsc2NyZWVuXSwgdmlkZW9cayk7CiAgaWYgKGhhc1BsYXllciAmJiB3aW5kb3cubG9jYXRpb24ucGF0aG5hbWUubGVuZ3RoID4gMSkgewogICAgZG9jdW1lbnQuYm9keS5jbGFzc0xpc3QuYWRkKCd0di1mdWxsc2NyZWVuLW1vdmllJyk7CiAgfSBlbHNlIHsKICAgIGRvY3VtZW50LmJvZHkuY2xhc3NMaXN0LnJlbW92ZSgndHYtZnVsbHNjcmVlbi1tb3ZpZScpOwogIH0KfSwgMTIwMCk7\", \"base64\").toString(\"utf8\");",
+            "",
+            "            webView.setWebViewClient(new BridgeWebViewClient(this.bridge) {",
+            "                @Override",
+            "                public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {",
+            "                    String url = request.getUrl().toString().toLowerCase();",
+            "                    for (String adHost : AD_HOSTS) {",
+            "                        if (url.contains(adHost)) {",
+            "                            return new WebResourceResponse(\"text/plain\", \"utf-8\", new ByteArrayInputStream(new byte[0]));",
+            "                        }",
+            "                    }",
+            "                    return super.shouldInterceptRequest(view, request);",
+            "                }",
+            "                @Override",
+            "                public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {",
+            "                    String url = request.getUrl().toString().toLowerCase();",
+            "                    if (request.isForMainFrame() && !url.contains(\"zxcstream.com\")) {",
+            "                        return true;",
+            "                    }",
+            "                    return super.shouldOverrideUrlLoading(view, request);",
+            "                }",
+            "                @Override",
+            "                public void onPageFinished(WebView view, String url) {",
+            "                    super.onPageFinished(view, url);",
+            "                    view.evaluateJavascript(" + JSON.stringify(Buffer.from("d2luZG93Lm9wZW4gPSBmdW5jdGlvbigpIHsgcmV0dXJuIG51bGw7IH07CnZhciBzdHlsZSA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ3N0eWxlJyk7CnN0eWxlLmlubmVySFRNTCA9ICcqIHsgYmFja2Ryb3AtZmlsdGVyOiBub25lICFpbXBvcnRhbnQ7IC13ZWJraXQtYmFja2Ryb3AtZmlsdGVyOiBub25lICFpbXBvcnRhbnQ7IHRyYW5zaXRpb24tZHVyYXRpb246IDBzICFpbXBvcnRhbnQ7IH0gKjpmb2N1cyB7IG91dGxpbmU6IDNweCBzb2xpZCAjRDYwMDAwICFpbXBvcnRhbnQ7IG91dGxpbmUtb2Zmc2V0OiAycHggIWltcG9ydGFudDsgfSBib2R5LnR2LWZ1bGxzY3JlZW4tbW92aWUgaWZyYW1lLCBib2R5LnR2LWZ1bGxzY3JlZW4tbW92aWUgdmlkZW8geyBwb3NpdGlvbjogZml4ZWQgIWltcG9ydGFudDsgaW5zZXQ6IDAgIWltcG9ydGFudDsgd2lkdGg6IDEwMHZ3ICFpbXBvcnRhbnQ7IGhlaWdodDogMTAwdmggIWltcG9ydGFudDsgei1pbmRleDogOTk5OTk5ICFpbXBvcnRhbnQ7IGJhY2tncm91bmQ6ICMwMDAgIWltcG9ydGFudDsgfSc7CmRvY3VtZW50LmhlYWQuYXBwZW5kQ2hpbGQoc3R5bGUpOwpzZXRJbnRlcnZhbChmdW5jdGlvbigpIHsKICB2YXIgaGFzUGxheWVyID0gZG9jdW1lbnQucXVlcnlTZWxlY3RvcignaWZyYW1lW2FsbG93ZnVsbHNjcmVlbl0sIGlmcmFtZVtzcmMqPSBlbWJlZF0sIGlmcmFtZVtzcmMqPSBwbGF5ZXJdLCB2aWRlbycpOwogIGlmIChoYXNQbGF5ZXIgJiYgd2luZG93LmxvY2F0aW9uLnBhdGhuYW1lLmxlbmd0aCA+IDEpIHsKICAgIGRvY3VtZW50LmJvZHkuY2xhc3NMaXN0LmFkZCgndHYtZnVsbHNjcmVlbi1tb3ZpZScpOwogIH0gZWxzZSB7CiAgICBkb2N1bWVudC5ib2R5LmNsYXNzTGlzdC5yZW1vdmUoJ3R2LWZ1bGxzY3JlZW4tbW92aWUnKTsKICB9Cn0sIDEwMDApOw==", "base64").toString("utf8")) + ", null);",
+            "                }",
+            "            });",
+            "        }",
+            "    }",
+            "",
+            "    // 4. Smart Remote Back / Exit Button Protection (Never Close on Single Press)",
+            "    @Override",
+            "    public boolean dispatchKeyEvent(KeyEvent event) {",
+            "        int keyCode = event.getKeyCode();",
+            "        if ((keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) && event.getAction() == KeyEvent.ACTION_DOWN) {",
+            "            handleTvBackButton();",
+            "            return true;",
+            "        }",
+            "        return super.dispatchKeyEvent(event);",
+            "    }",
+            "",
+            "    @Override",
+            "    public void onBackPressed() {",
+            "        handleTvBackButton();",
+            "    }",
+            "",
+            "    private void handleTvBackButton() {",
+            "        if (customView != null) {",
+            "            ViewGroup decor = (ViewGroup) getWindow().getDecorView();",
+            "            decor.removeView(customView);",
+            "            customView = null;",
+            "            if (customViewCallback != null) customViewCallback.onCustomViewHidden();",
+            "            if (this.bridge != null && this.bridge.getWebView() != null) {",
+            "                this.bridge.getWebView().setVisibility(View.VISIBLE);",
+            "            }",
+            "            return;",
+            "        }",
+            "        if (this.bridge != null && this.bridge.getWebView() != null && this.bridge.getWebView().canGoBack()) {",
+            "            this.bridge.getWebView().goBack();",
+            "            return;",
+            "        }",
+            "        long now = System.currentTimeMillis();",
+            "        if (now - lastBackPressTime < 2000) {",
+            "            finish();",
+            "        } else {",
+            "            lastBackPressTime = now;",
+            "            Toast.makeText(this, \"Press Back again to exit ZXC Stream\", Toast.LENGTH_SHORT).show();",
+            "        }",
+            "    }",
+            "",
+            "    @Override",
+            "    public void startActivity(Intent intent) {",
+            "        if (intent != null && Intent.ACTION_VIEW.equals(intent.getAction())) {",
+            "            return;",
+            "        }",
+            "        super.startActivity(intent);",
+            "    }",
+            "",
+            "    @Override",
+            "    public void onWindowFocusChanged(boolean hasFocus) {",
+            "        super.onWindowFocusChanged(hasFocus);",
+            "        if (hasFocus) hideSystemBars();",
+            "    }",
+            "",
+            "    private void hideSystemBars() {",
+            "        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);",
+            "        WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());",
+            "        if (controller != null) {",
+            "            controller.hide(WindowInsetsCompat.Type.systemBars());",
+            "            controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);",
+            "        }",
+            "    }",
+            "}"
+          ];
+          fs.writeFileSync("android/app/src/main/java/com/zxcstream/app/MainActivity.java", tvJavaLines.join(String.fromCharCode(10)));
 
           // 3. Render 320x180 TV Home Banner into drawable/tv_banner.png
           const tvBannerSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="320" height="180"><rect width="320" height="180" fill="#0B0B0B"/><g transform="translate(102, 32) scale(0.225)"><polygon points="315,245 352,282 275,359 238,322" fill="#4A1C1C"/><path d="M 42,52 L 502,52 Q 512,52 504,62 L 154,412 L 320,412 L 385,332 L 504,452 Q 512,460 500,460 L 12,460 Q 0,460 8,450 L 358,100 L 92,100 L 36,60 Q 32,52 42,52 Z" fill="#D60000"/></g></svg>`;
